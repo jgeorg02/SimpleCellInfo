@@ -17,10 +17,10 @@ import android.telephony.CellInfoGsm;
 import android.telephony.CellInfoLte;
 import android.telephony.CellInfoWcdma;
 import android.telephony.CellLocation;
-import android.telephony.NeighboringCellInfo;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -34,20 +34,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
 
-import static android.telephony.TelephonyManager.NETWORK_TYPE_GPRS;
-import static android.telephony.TelephonyManager.NETWORK_TYPE_GSM;
-import static android.telephony.TelephonyManager.NETWORK_TYPE_HSDPA;
-import static android.telephony.TelephonyManager.NETWORK_TYPE_HSPA;
-import static android.telephony.TelephonyManager.NETWORK_TYPE_LTE;
-import static android.telephony.TelephonyManager.NETWORK_TYPE_UMTS;
-import static android.telephony.TelephonyManager.PHONE_TYPE_CDMA;
-
 public class MainActivity extends Activity {
     int counter = 0;
     int changes = 0;
     TelephonyManager mTelephonyManager;
     TextView tvNetworkInfo;
-    // get lat, lon, fix this
+    TextView txtList;
     Location location; // location
     double latitude = 0.0; // latitude
     double longitude = 0.0; // longitude
@@ -85,6 +77,8 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         tvNetworkInfo = (TextView) findViewById(R.id.tvNetworkInfo);
+        txtList = (TextView) findViewById(R.id.tvNetworkInfo2);
+        txtList.setMovementMethod(new ScrollingMovementMethod());
 
         if (getPermissions()) {
             permissions = true;
@@ -109,6 +103,11 @@ public class MainActivity extends Activity {
 
     }
 
+    /**
+     * Listener that waits the button to be clicked
+     *
+     * @param view, the view of the app
+     */
     public void clicked(View view) {
         Button st = findViewById(R.id.button_start);
         if (permissions) {
@@ -123,20 +122,10 @@ public class MainActivity extends Activity {
         }
     }
 
-    /*
-
-    final Handler ha=new Handler();
-ha.postDelayed(new Runnable() {
-
-    @Override
-    public void run() {
-        //call function
-
-        ha.postDelayed(this, 10000);
-    }
-}, 10000);
+    /**
+     * This is the listener that waits the signal to change, or the cells to change
+     * so that it can save the cell info
      */
-
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
 
         @Override
@@ -147,80 +136,94 @@ ha.postDelayed(new Runnable() {
         @Override
         public void onCellLocationChanged(CellLocation location) {
             onCellInfoChanged(null);
-
         }
 
 
         @SuppressLint({"NewApi", "MissingPermission"})
         @Override
+        /**
+         * Gets the cell info
+         * @param cellInfoList, the list the contains all cells with their info
+         */
         public void onCellInfoChanged(List<CellInfo> cellInfoList) {
 
-            int signal = 0;
+            int signal = 0, cid = 0, mnc = 0, mcc = 0, lac = 0, cells = 0;
             String type = "";
-            int cid = 0;
-            int mnc = 0;
-            int lac = 0;
-            int cells = 0;
             StringBuilder data = new StringBuilder();
-            StringBuilder error = new StringBuilder();
+            //StringBuilder error = new StringBuilder();
 
-
-            //Log.i("lat", String.valueOf(latitude));
-            //Log.i("lon", String.valueOf(longitude));
             Long tsLong = System.currentTimeMillis() / 1000;
             String ts = tsLong.toString();
 
-            // This callback method will be called automatically by Android OS
-            // Every time a cell info changed (if you are registered)
-            // Here, you will receive a cellInfoList....
 
             cellInfoList = mTelephonyManager.getAllCellInfo();
-            if (mTelephonyManager.getAllCellInfo() != null)
+            if (mTelephonyManager.getAllCellInfo() != null) {
+                int cellids[] = new int[cellInfoList.size()];
                 for (int i = 0; i < cellInfoList.size(); i++) {
                     CellInfo info = cellInfoList.get(i);
                     if (info instanceof CellInfoGsm) {
                         signal = ((CellInfoGsm) info).getCellSignalStrength().getDbm();
                         type = "GSM";
+                        cellids[i] = cid;
                         cid = ((CellInfoGsm) info).getCellIdentity().getCid();
                         mnc = ((CellInfoGsm) info).getCellIdentity().getMnc();
                         lac = ((CellInfoGsm) info).getCellIdentity().getLac();
+                        mcc = ((CellInfoGsm) info).getCellIdentity().getMcc();
                     } else if (info instanceof CellInfoWcdma) {
+                        cellids[i] = cid;
                         signal = ((CellInfoWcdma) info).getCellSignalStrength().getDbm();
                         type = "WCDMA";
                         cid = ((CellInfoWcdma) info).getCellIdentity().getCid();
                         mnc = ((CellInfoWcdma) info).getCellIdentity().getMnc();
                         lac = ((CellInfoWcdma) info).getCellIdentity().getLac();
+                        mcc = ((CellInfoWcdma) info).getCellIdentity().getMcc();
                     } else if (info instanceof CellInfoCdma) {
+                        cellids[i] = cid;
                         signal = ((CellInfoCdma) info).getCellSignalStrength().getDbm();
                         type = "CDMA";
                         cid = ((CellInfoCdma) info).getCellIdentity().getBasestationId();
                         mnc = ((CellInfoCdma) info).getCellIdentity().getSystemId();
                         lac = ((CellInfoCdma) info).getCellIdentity().getNetworkId();
 
+                        if (mnc != 0) mcc = 280;
                     } else {
+                        cellids[i] = cid;
                         signal = ((CellInfoLte) info).getCellSignalStrength().getDbm();
                         type = "LTE";
                         cid = ((CellInfoLte) info).getCellIdentity().getCi();
                         mnc = ((CellInfoLte) info).getCellIdentity().getMnc();
                         lac = ((CellInfoLte) info).getCellIdentity().getTac();
+                        mcc = ((CellInfoLte) info).getCellIdentity().getMcc();
 
                     }
-                    if (cid == 2147483647)
-                        error.append(ts + " " + latitude + " " + longitude + " " + type + " ");
-                    else {
-                        data.append(ts + "," + latitude + "," + longitude + "," + type + "," + signal + "," + cid + "," + mnc + "," + lac + "," + "\n");
+                    //if ((cid == 2147483647) || (cid == -1))
+                    //  error.append(ts + " " + latitude + " " + longitude + " " + type + " ");
+                    //else {
+                    boolean flag = false;
+                    if (cid != 2147483647 && mcc == 280) {
+                        for (int j = 0; j < i; j++)
+                            if (cellids[j] == cid) {
+                                flag = true;
+                                break;
+                            }
+                        if (!flag)
+                            data.append(ts + "," + latitude + "," + longitude + "," + type + "," + signal + "," + cid + "," + mnc + "," + lac + "," + "\n");
                         cells++;
-                    }//Log.i("data", data);
-
+                    }
+                    txtList.append(" \n Timestamp: " + ts + "\n Lat: " + latitude + "\n Lon: " + longitude +
+                            "\n Type: " + type + "\n Signal: " + signal + "\n CellID: " + cid + "\n MNC: " + mnc + "\n LAC: " + lac + "\n");
                 }
-            else Log.i("info", "null cellinfo");
+            } else Log.i("info", "null cellinfo");
             if (data.length() > 0) writeToFile(data, 0);
-            if (error.length() > 0) writeToFile(error, 1);
-            tvNetworkInfo.setText("Changes in Cell info: " + (changes++) + " cells: " + cells + "\n timestamp, lat, lon, type, signal, cid, mnc, lac\n" + data);
+            //if (error.length() > 0) writeToFile(error, 1);
+            tvNetworkInfo.setText("Changes in Cell info: " + (changes++) + " Current Cells: " + cells);
         }
     };
 
     @Override
+    /**
+     * When the 'Start' button is pressed, starts getting cell info
+     */
     public void onStart() {
         super.onStart();
 
@@ -232,6 +235,9 @@ ha.postDelayed(new Runnable() {
     }
 
     @Override
+    /**
+     *  When the 'Stop' button is pressed, stops getting cell info
+     */
     public void onStop() {
         // Code below unregister your listener... You will not receive any cell info change notification anymore
         TelephonyManager mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
@@ -239,6 +245,12 @@ ha.postDelayed(new Runnable() {
         super.onStop();
     }
 
+    /**
+     * This method writes into a file the cell measurements and errors if there are any kind of errors
+     *
+     * @param data, the data the will be written into the file.
+     * @param type, 0 for measurements, 1 for errors
+     */
     private void writeToFile(StringBuilder data, int type) {
 
         File file = new File(Environment.getExternalStorageDirectory(), "/mymetrics");
@@ -249,8 +261,9 @@ ha.postDelayed(new Runnable() {
         try {
             File gpxfile;
             if (type == 0)
-                gpxfile = new File(file, "metrics.txt");
-            else gpxfile = new File(file, "errors.txt");
+                gpxfile = new File(file, "measurements.csv");
+            else gpxfile = new File(file, "errors.csv");
+
             //Read text from file
             StringBuilder text = new StringBuilder();
             try {
@@ -263,17 +276,15 @@ ha.postDelayed(new Runnable() {
                 }
                 br.close();
             } catch (IOException e) {
-                //You'll need to add proper error handling here
+                Log.e("Error", "Writing in file");
             }
 
             FileWriter writer = new FileWriter(gpxfile);
             writer.append(String.valueOf(text) + String.valueOf(data));
-            //Log.i("write", data);
-            //Log.i("read", String.valueOf(text));
+
             writer.flush();
             writer.close();
 
-            //Log.i("file", gpxfile.getParent());
 
         } catch (Exception e) {
             Log.e("Exception", "File write failed: " + e.toString());
@@ -281,6 +292,9 @@ ha.postDelayed(new Runnable() {
         }
     }
 
+    /**
+     * This method gets the permissions for everything that the application uses
+     */
     public boolean getPermissions() {
 
         int result = 0, coarseLocation, write, read, fineLocation;
@@ -309,7 +323,7 @@ ha.postDelayed(new Runnable() {
 
             // No explanation needed; request the permission
             ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                     result);
 
             write = result;
@@ -326,7 +340,7 @@ ha.postDelayed(new Runnable() {
 
             // No explanation needed; request the permission
             ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
                     result);
 
             read = result;
@@ -343,7 +357,7 @@ ha.postDelayed(new Runnable() {
 
             // No explanation needed; request the permission
             ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                     result);
 
             fineLocation = result;
@@ -351,6 +365,7 @@ ha.postDelayed(new Runnable() {
             // Permission has already been granted
             fineLocation = 1;
         }
-        return (coarseLocation == 1 && fineLocation == 1 && read == 1 && write == 1);
+        //return (coarseLocation == 1 && fineLocation == 1 && read == 1 && write == 1);
+        return true;
     }
 }
